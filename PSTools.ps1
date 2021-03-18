@@ -110,7 +110,7 @@ function Decrypt-String($Encrypted, $Passphrase, $salt = "SaltCrypto", $init = "
 }
 
 # This clears the screen of the output from the loading of the assembly.
-cls
+Clear-Host
 <#
 .Synopsis
    Write to event log
@@ -236,13 +236,13 @@ Function Get-PendingRebootStatus {
                         $Properties = @{ComputerName = $Computer.ToUpper()
                             PendingReboot            = 'True'
                         }
-                        $Object = New-Object -TypeName PSObject -Property $Properties | Select ComputerName, PendingReboot
+                        $Object = New-Object -TypeName PSObject -Property $Properties | Select-Object ComputerName, PendingReboot
                     }
                     else {
                         $Properties = @{ComputerName = $Computer.ToUpper()
                             PendingReboot            = 'False'
                         }
-                        $Object = New-Object -TypeName PSObject -Property $Properties | Select ComputerName, PendingReboot
+                        $Object = New-Object -TypeName PSObject -Property $Properties | Select-Object ComputerName, PendingReboot
                     }
                 }
                  
@@ -251,7 +251,7 @@ Function Get-PendingRebootStatus {
                 $Properties = @{ComputerName = $Computer.ToUpper()
                     PendingReboot            = 'Error'
                 }
-                $Object = New-Object -TypeName PSObject -Property $Properties | Select ComputerName, PendingReboot
+                $Object = New-Object -TypeName PSObject -Property $Properties | Select-Object ComputerName, PendingReboot
  
                 $ErrorMessage = $Computer + " Error: " + $_.Exception.Message
                 $ErrorsArray += $ErrorMessage
@@ -902,8 +902,8 @@ function Create-DSN {
     }
     Process {
 
-        If (!(Test-path $HKLMPath1)) { md $HKLMPath1 -ErrorAction silentlycontinue }
-        If (!(Test-path $HKLMPath2)) { md $HKLMPath2 -ErrorAction silentlycontinue }
+        If (!(Test-path $HKLMPath1)) { mkdir $HKLMPath1 -ErrorAction silentlycontinue }
+        If (!(Test-path $HKLMPath2)) { mkdir $HKLMPath2 -ErrorAction silentlycontinue }
         set-itemproperty -path $HKLMPath1 -name Driver -value $Driver
         set-itemproperty -path $HKLMPath1 -name Description -value $Description
         set-itemproperty -path $HKLMPath1 -name ServerName -value "$($ServerName).1583"
@@ -1614,7 +1614,7 @@ function Get-NetworkStatistics {
             #Collect processes
             if ($ShowProcessNames) {
                 Try {
-                    $processes = Get-Process -ComputerName $Computer -ErrorAction stop | select name, id
+                    $processes = Get-Process -ComputerName $Computer -ErrorAction stop | Select-Object name, id
                 }
                 Catch {
                     Write-warning "Could not run Get-Process -computername $Computer.  Verify permissions and connectivity.  Defaulting to no ShowProcessNames"
@@ -1769,7 +1769,7 @@ function Get-NetworkStatistics {
                     if ($ShowProcessNames -or $PSBoundParameters.ContainsKey -eq 'ProcessName') {
                         
                         #handle case where process spun up in the time between running get-process and running netstat
-                        if ($procName = $processes | Where { $_.id -eq $procId } | select -ExpandProperty name ) { }
+                        if ($procName = $processes | Where-Object { $_.id -eq $procId } | Select-Object -ExpandProperty name ) { }
                         else { $procName = "Unknown" }
 
                     }
