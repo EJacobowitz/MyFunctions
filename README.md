@@ -1,4 +1,3 @@
 # MyFunctions
 
-one powershell script with helpful functions for me
-I use this script in my other larger scripts calling the differnt functions
+this repo is to store any functions I have built as a save location so I can use them on other PC's in the future and or to "borrow" code I had already done. 
