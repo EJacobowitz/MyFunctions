@@ -1,21 +1,4 @@
 ﻿#Tools for powershell scripting
-#Table of contents:
-# Function Name                         Line #
-# Encrypt-String                         35
-# Decrypt-String                         73
-# write-customlog                        126
-# Get-PendingRebootStatus                166
-# right                                  281
-# add-psqldsn                            327
-# Listen-Port                            433
-# Remove-UserProfile                     488
-# Get-PendingReboot                      641
-# start-pause                            862
-# Add-MvaNetFirewallRemoteAdressFilter   876
-# Get-odbcdata                           941
-# Get-NetworkStatistics                  998
-# Get-Uptime                             1408
-#--------------------------#
 
 #################
 # Powershell Allows The Loading of .NET Assemblies
@@ -29,7 +12,7 @@
 # $salt is used during the generation of the crypto password to prevent password guessing.
 # $init is used to compute the crypto hash -- a checksum of the encryption
 #################
-function Encrypt-String($String, $Passphrase, $salt="SaltCrypto", $init="IV_Password", [switch]$arrayOutput)
+function invoke-EncryptString($String, $Passphrase, $salt="SaltCrypto", $init="IV_Password", [switch]$arrayOutput)
 {
 	# Create a COM Object for RijndaelManaged Cryptography
 	$r = new-Object System.Security.Cryptography.RijndaelManaged
@@ -67,7 +50,7 @@ function Encrypt-String($String, $Passphrase, $salt="SaltCrypto", $init="IV_Pass
 	return [Convert]::ToBase64String($result)
 }
 
-function Decrypt-String($Encrypted, $Passphrase, $salt="SaltCrypto", $init="IV_Password")
+function invoke-DecryptString($Encrypted, $Passphrase, $salt="SaltCrypto", $init="IV_Password")
 {
 	# If the value in the Encrypted is a string, convert it to Base64
 	if($Encrypted -is [string]){
@@ -108,7 +91,6 @@ function Decrypt-String($Encrypted, $Passphrase, $salt="SaltCrypto", $init="IV_P
 }
 
 # This clears the screen of the output from the loading of the assembly.
-cls
  <#
 .Synopsis
    Write to event log
@@ -275,7 +257,7 @@ Function Get-PendingRebootStatus {
     END {}
 }
 
-Function right {
+Function get-rightstring {
    [CmdletBinding()]
  
    Param (
@@ -289,14 +271,21 @@ $startchar = [math]::max(0, $startchar)
 $right = $text.SubString($startchar ,[math]::min($text.length, $Length))
 $right
 }
-filter Assert-FolderExists
-{
-  $exists = Test-Path -Path $_ -PathType Container
-  if (!$exists) { 
-    Write-Warning "$_ did not exist. Folder created."
-    $null = New-Item -Path $_ -ItemType Directory 
-  }
+
+function New-FolderIfMissing {
+    [CmdletBinding()]
+    param(
+        [Parameter(ValueFromPipeline = $true, Mandatory = $true)]
+        [string]$Path
+    )
+    process {
+        if (-not (Test-Path -Path $Path -PathType Container)) {
+            Write-Warning "$Path did not exist. Folder created."
+            $null = New-Item -Path $Path -ItemType Directory
+        }
+    }
 }
+
 
 <#
 .Synopsis
@@ -421,7 +410,7 @@ function add-psqldsn
     }
 }
 
-function Listen-Port ($port=80){
+function Start-TcpListener ($port=80){
 <#
 .DESCRIPTION
 Temporarily listen on a given port for connections dumps connections to the screen - useful for troubleshooting
@@ -855,7 +844,7 @@ function start-pause
     #Press any key to continue
     if ($PSise){
 
-        read-host “Press ENTER to continue...”
+        read-host "Press ENTER to continue..."
 
     }Else{
 
@@ -972,19 +961,6 @@ function Get-odbcdata
     }
 }
 
-#Examples of usage
-# making sure a bunch of folders exist
-#'C:\test1', 'C:\test2' | Assert-FolderExists
-# making sure the path assigned to a variable exists
-#($Path = 'c:\test3') | Assert-FolderExists 
-filter Assert-FolderExists
-{
-  $exists = Test-Path -Path $_ -PathType Container
-  if (!$exists) { 
-    Write-Warning "$_ did not exist. Folder created."
-    $null = New-Item -Path $_ -ItemType Directory 
-  }
-}
 
 function Get-NetworkStatistics {
     <#
@@ -1434,11 +1410,60 @@ Function Get-Uptime {
     } 
     end{} 
 }
+
+<#
+    Simple screen writer with timestamp 
+#>
+function Write-TS {
+    param(
+        [string]$Message,
+        [string]$Color 
+    )
+
+    $ts = (Get-Date -Format 's')
+    if ($Color) {
+        Write-Host "[$ts]: $Message" -ForegroundColor $Color
+    }
+    else {
+        Write-Host "[$ts]: $Message"
+    }
+}
+
+function Write-Log {
+    param([string]$msg)
+
+    if (-not $LogPath) {
+        # no logpath defined → just print to console
+        Write-Host $msg
+        return
+    }
+
+    try {
+        # ensure folder exists
+        $dir = Split-Path $LogPath -Parent
+        if (-not (Test-Path $dir)) {
+            New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        }
+
+        # ensure file exists
+        if (-not (Test-Path $LogPath)) {
+            New-Item -ItemType File -Path $LogPath -Force | Out-Null
+        }
+
+        # write line with timestamp
+        "[{0}] {1}" -f (Get-Date -Format s), $msg | Add-Content -Path $LogPath -Encoding utf8
+    }
+    catch {
+        Write-Warning "Write-Log failed: $($_.Exception.Message)"
+        Write-Host $msg
+    }
+}
+
 # SIG # Begin signature block
 # MIIb1AYJKoZIhvcNAQcCoIIbxTCCG8ECAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQULh3ZcgGInNpKNCKBOa3vdtbA
-# Z0ugghZEMIIDBjCCAe6gAwIBAgIQEBhQPUc10ahAl/Rc6gVKqzANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUSoZPQpjZEJuEUdyKBlNHtb8K
+# vtagghZEMIIDBjCCAe6gAwIBAgIQEBhQPUc10ahAl/Rc6gVKqzANBgkqhkiG9w0B
 # AQsFADAbMRkwFwYDVQQDDBBTT1QgQXV0aGVudGljb2RlMB4XDTI1MDMyNzE4NDUy
 # MVoXDTI2MDMyNzE5MDUyMVowGzEZMBcGA1UEAwwQU09UIEF1dGhlbnRpY29kZTCC
 # ASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAN3sN1zCeitPV5zENSgiiTg/
@@ -1560,28 +1585,28 @@ Function Get-Uptime {
 # BPYCAQEwLzAbMRkwFwYDVQQDDBBTT1QgQXV0aGVudGljb2RlAhAQGFA9RzXRqECX
 # 9FzqBUqrMAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkG
 # CSqGSIb3DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEE
-# AYI3AgEVMCMGCSqGSIb3DQEJBDEWBBQTO9dEsJa0msc3unZqvqmecnz4MzANBgkq
-# hkiG9w0BAQEFAASCAQBfgIgPbGA7y9Eop0Tp5wRnpfuPUoMc9uUdljAk0/OUTw7T
-# wd0aQxcw5YI0wG/d0Dzo1ea3OfuZ3KLgQHjfx462khDwWLgbEkOffzI9WqDrTk1y
-# KuTSFHX3vKxSByvJyTKmwgM1YNoiH+/ZIhziE4ckEMwudDnWJybEa5WCEU+d/Mjz
-# 8o7itVVyuvwYQZCZBaJW767HjckgATrLP5UNAVblSRcNI6RYZoPkv01dlz93L9nO
-# 9rAySVJRXfZA2t1I6qTqB7GFX3P2z7kS4zv2eB3KZWHixi3cP3znFLnig5lqX7lO
-# w8fiULg1DVhKNGUhryIQSQf+ejbuxuc5lSGschsroYIDJjCCAyIGCSqGSIb3DQEJ
+# AYI3AgEVMCMGCSqGSIb3DQEJBDEWBBTvdugUhAJxtEq9GeG2c0EqTT+YsDANBgkq
+# hkiG9w0BAQEFAASCAQBsqm3iS7Y2HeDUkTZkoCQioYknmrxby+XIjO72gAGAF08j
+# g/qBeESItJHbMpJDcNcOvlg+NymxEfHBSFJE91PjYDR5wN4eW/2ozn0k3eckyPVy
+# hU2BUnHCAtMCyVNGBosJ0knmqWVptvvQ09Hgw3HKGbNXNJr0t9ZPR3vo6575jeWV
+# AV2wyZZAfy0XIRYPRxNqepnzW6ZYLwkL28q0IaeO37YKH2GTIAqhTSwq77abxKXo
+# vufO5ezrsZerRjaaba1RaSG7z7Dvh4fXJrXy828sxyId90foy/43/q9dLqB99PBT
+# UaGPrk2y4lG/TdbwTupR6gnCxLqqmvaAWZpJlqHyoYIDJjCCAyIGCSqGSIb3DQEJ
 # BjGCAxMwggMPAgEBMH0waTELMAkGA1UEBhMCVVMxFzAVBgNVBAoTDkRpZ2lDZXJ0
 # LCBJbmMuMUEwPwYDVQQDEzhEaWdpQ2VydCBUcnVzdGVkIEc0IFRpbWVTdGFtcGlu
 # ZyBSU0E0MDk2IFNIQTI1NiAyMDI1IENBMQIQCoDvGEuN8QWC0cR2p5V0aDANBglg
 # hkgBZQMEAgEFAKBpMBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcN
-# AQkFMQ8XDTI1MTExODIwMzIxNlowLwYJKoZIhvcNAQkEMSIEIAE4nZvy69IU2c26
-# gpSfJ12AYalTGtbk/9FkUZGJ5LSoMA0GCSqGSIb3DQEBAQUABIICAICPXUQwCR2A
-# jzBegDiZ/yUrZjfqBjyb1EZ8zyCODQi3zR0FBrdx2Pl9b39DZhufnbNg7AF23/ia
-# KL76gc6EdtK50M4ANVJabdY74imt8wInkkIg7NKCLpvfyQK/NU+uCwohYX0qH9Db
-# 1TadYZ7LD/i61Z3JEdZ/VwZYeHk2MGHkjfu25EIMaSny4IRUZbo/cFFHkUZ7L+8B
-# YTvrhfy9BLUMCrPeikj6g21k+CkTmP4F57ZYVqqBZXQg+fhEoVwtZVthn2lHuj4v
-# I5cjlzxI1Mua4ZZcjCBnTaityXngrMYoe6Lr0eTqyoSXF3LtyxMBmbL0sybRDxm2
-# kBqHwQypIlCLJi/4JqRF2qsQrpFUVuHCicOWjiCIbOeDZB2hXoGgLAcDg3Qzn0mb
-# T/OzBjxHSQZ+Gkp/4CLics9fA2Un7FpA5CnTmwo5r+WlDw8VkDyVc2qwVkJyE6Qf
-# 3Vq4ozaMrMVf87AVN1Y32tZWqvzFDCYtA0DWHIMIUg1obIa9y2mk30r+ghFGjoR0
-# 8ctJauaOXxSASQqCPl879xVGXYw3wYg61V4bYSBVECYS2DHqI2GO3+4ylK6i5wBu
-# NEd83dYlV5fKZUaJa4PzHWpapxyZ2lmHMrea6a9ynaZVIfyyjgfAAW8NKmftQBee
-# xJbMn2mVZ9++Lajfsj0LSaqy4k7vQ81P
+# AQkFMQ8XDTI2MDIwMzE0NDgyMFowLwYJKoZIhvcNAQkEMSIEIJ8j2h6VqN630L4Z
+# 6JQ8PTVFOz7mZ5d8ZGDPAyD6m6ZTMA0GCSqGSIb3DQEBAQUABIICAKiybxoJFriW
+# dBclKs7thLGOPE94kKUCvsKpb4+q4E43Quxzkm7ls+Ia6je2JZRXYJQ7Knvgwyhg
+# uRFLk9jYBZ+z5xho9C4HbEzSnIW/UZQm78FhZxOIsqxPEqRPfvHxNEpc4/Wltdar
+# mCJBl4URjVJyST6pO5dcX7Sp8HNM53+RZ7ev26EKNsG2fPidv5LpIFyUsrqyeEij
+# ZqWCmp8NOlNf68BU8QLBOJQE1cm6ckkzlrtYH0yMC//ixnl+qFtLjrTOuPPnRi4C
+# Y6E+9wbylaUG39S/Fg9G/fQr7anbK9dV9EdKEUZiV8I2LQRTXko6GayQMGKHdhcm
+# c9bxphlYMryu/j7VYdBEcxUAWwn/azPjsvnUcGhHcZ6N9+eG4luY0CHQIhZxQ6M1
+# kQKoA4jECY8nGHi9vY1iSNEAFtGhUlLe3EkoyrrEFN+WZX2d+/iAZMoctXbfuKHa
+# +2LYw/TkFaF360jwkyxP17mB7BmfU8hGx7XTqUrQARlkO6kDGWu9D/nTyRkZ2yzv
+# rQX4Y5MhtfXr+RKcz+IyqvAOTTmvQUGPWDT6sTeQa4WLFMB41POwdwkfFvWihCgp
+# e8dUAfexhoI1kEJndZyRRRBWYLh1IGLsWwpX3DKN7DkZM9LQni/eC1MMp/rOQLK+
+# 6ZnMnMwTMdA3x+84qZ0petbPruTqF/bo
 # SIG # End signature block
